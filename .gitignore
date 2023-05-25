@@ -2,9 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+node_modules/
+src/*.part
+src/*.part-Frag*
+src/*.live_chat.json
 # C extensions
 *.so
+
+.vscode
 
 # Distribution / packaging
 .Python
