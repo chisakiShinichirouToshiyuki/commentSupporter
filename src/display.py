@@ -7,6 +7,7 @@ import os
 import json
 from multiprocessing import Queue
 import copy
+from GptHandler import チャットGPTハンドラークラス
 
 import openai
 
@@ -191,7 +192,7 @@ def get_update_date(file_path: str) -> float:
     return os.path.getmtime(file_path)
 
 
-def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],api_key:str,prompt_setting:dict):
+def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス):
     current_modified_date = get_update_date(chat_file_path)
     comments_modified: list[str] = []
     if current_modified_date > last_modified_date:
@@ -217,12 +218,8 @@ def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_ro
                 '名前': comment_history_last['displayName'],
                 'コメント': comments_modified
             }
-            if (api_key != ''):
-                openai.api_key = api_key
-                prompt_setting_current = copy.deepcopy(prompt_setting)
-                prompt_setting_current['messages'][-1]['content'] = prompt_setting_current['messages'][-1]['content']+str(comments_modified[::-1])
-                res = openai.ChatCompletion.create(**prompt_setting_current)
-                messages_modified['分析'] = res["choices"][0]["message"]["content"]
+            if (チャットGPTハンドラー.api_key != ''):
+                messages_modified['分析'] = チャットGPTハンドラー.チャットGPTへ問いかけ(comments_modified[::-1])
 
             if queue != '':
                 queue.put(
@@ -240,38 +237,7 @@ def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_ro
             #     comment_history_list[last_row], indent=2, ensure_ascii=False))
             # print('++++++++++')
             pass
-    return (last_modified_date, comment_history_dict,comments_modified)
-
-def display_latest_chat(queue, last_modified_date:float, file_path:str, comment_history_dict: Dict[str, List[CommentData]]):
-    wip_file_path = get_latest_file_path(file_path)
-    current_modified_date = get_update_date(wip_file_path)
-    # if current_modified_date > last_modified_date:
-    last_modified_date = current_modified_date
-    wip_comments_str = text_reader(wip_file_path)
-    comment_data = json.loads(wip_comments_str)['continuationContents']['liveChatContinuation']['actions'][-1]['addChatItemAction']['item']['liveChatTextMessageRenderer']
-    try:
-        messages = {
-            '名前': comment_data['authorName']['simpleText'],
-            'コメント': [comment_data['message']['runs'][0]['text']]
-        }
-        user_id = comment_data["authorExternalChannelId"]
-        if user_id in comment_history_dict:
-            messages['コメント'] = messages['コメント']+[comment['comment']  for comment in comment_history_dict[user_id]]
-        if queue != '':
-            queue.put(
-                # messages_modified
-                json.dumps(messages, ensure_ascii=False, indent=2)
-            )
-        else:
-            print(json.dumps(messages, ensure_ascii=False, indent=2))
-    # except :
-    except Exception as error:
-        # print('----------')
-        # print('error')
-        # print(error)
-        # print('++++++++++')
-        pass
-    return last_modified_date
+    return (last_modified_date, comment_history_dict)
 
 def is_running_on_colab():
     return 'COLAB_GPU' in os.environ
@@ -293,34 +259,24 @@ def get_latest_file_path(chat_file_path:str):
 
 
 
-def replace_watch_comment(queue, live_id: str,api_key:str,prompt_setting:dict):
+def replace_watch_comment(queue, live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
     """"
         watch_comment(last_modified_date)を1秒待機しては、繰り返し実行する.
         再帰ではなくwhileを使う
     """
+    queue.put('test')
     # 初期化
     comment_history_dict: Dict[str, List[CommentData]] = {}
     last_row = 0
     last_history_modified_date:float =0
-    last_wip_modified_date:float =0
     chat_file_path:str
-    # if is_running_on_colab():
-    #     chat_file_path = f'{live_id}_.live_chat.json.part'
-    # else:
-    #     chat_file_path = f'./{live_id}_.live_chat.json.part'
     chat_file_path = f'./{live_id}_.live_chat.json.part'
     # 開始時刻を取得
     start_time = time.time()
-    # time.sleep(20)
-    # start_timeから10minいないならば、繰り返す
     while time.time() - start_time < 60*10:
         try:
-            # watch_comment  = watch_comment(queue, last_history_modified_date, chat_file_path,
-            last_history_modified_date,comment_history_dict,comments_modified  = watch_comment(queue, last_history_modified_date, chat_file_path,
-                        last_row, comment_history_dict, api_key,prompt_setting)
-            
-            
-            # last_wip_modified_date  = display_latest_chat(queue, last_wip_modified_date, chat_file_path,comment_history_dict)
+            last_history_modified_date,comment_history_dict = watch_comment(queue, last_history_modified_date, chat_file_path,
+                        last_row, comment_history_dict, チャットGPTハンドラー)
         except Exception as error:
             print(error)
             pass
