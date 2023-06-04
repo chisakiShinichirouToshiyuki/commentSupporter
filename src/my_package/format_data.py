@@ -10,9 +10,16 @@ import os
 import json
 from multiprocessing import Queue
 import glob
-
 import copy
-from commentSupporter.src.GptHandler import チャットGPTハンドラークラス
+from typing import TYPE_CHECKING
+
+def is_running_on_colab():
+    return 'COLAB_GPU' in os.environ
+
+if TYPE_CHECKING or not is_running_on_colab():
+    from my_package.gpt_handler import チャットGPTハンドラークラス
+else:
+    from commentSupporter.src.gpt_andler import チャットGPTハンドラークラス
 
 
 class CommentData(TypedDict):
@@ -321,8 +328,6 @@ def watch_comment(last_modified_date: float, chat_file_path: str, last_row: int,
         #     pass
     return (last_modified_date, comment_history_dict)
 
-def is_running_on_colab():
-    return 'COLAB_GPU' in os.environ
 
 def get_files_with_prefix(directory:str, prefix:str):
     # ディレクトリ内のすべてのファイル名を取得します。
