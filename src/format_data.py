@@ -181,9 +181,10 @@ def split_text(text: str) -> List[str]:
 def convert_json_to_dict(comment: CommentRowData) -> CommentData:
     action = comment["replayChatItemAction"]["actions"][0]["addChatItemAction"]["item"]["liveChatTextMessageRenderer"]
     return {
-        'userId': action["authorExternalChannelId"],
+        # 'userId': action["authorExternalChannelId"],
+        'userId': action["authorName"]["simpleText"],
         'displayName': action["authorName"]["simpleText"],
-        'date': datetime.fromtimestamp(int(action["timestampUsec"]) / 1_000_000).isoformat(),
+        'date': datetime.fromtimestamp(int(action["timestampUsec"]) / 1_000_000).strftime("%H:%M"),
         'comment': action["message"]["runs"][0]["text"]
     }
 
@@ -214,11 +215,11 @@ def update_dictionary(user_comments: Dict[str, List[CommentData]], comments: Lis
         try:
             data: CommentRowData = json.loads(comment)
             action = data["replayChatItemAction"]["actions"][0]["addChatItemAction"]["item"]["liveChatTextMessageRenderer"]
-            user_id = action["authorExternalChannelId"]
+            # user_id = action["authorExternalChannelId"]
+            user_id = action["authorName"]["simpleText"]
             current_comment: CommentData = {
-                # "displayName": action["authorName"]["simpleText"],
-                "displayName": user_id,
-                "date": datetime.fromtimestamp(int(action["timestampUsec"]) / 1_000_000).isoformat(),
+                "displayName": action["authorName"]["simpleText"],
+                "date": datetime.fromtimestamp(int(action["timestampUsec"]) / 1_000_000).strftime("%H:%M"),
                 "comment": ' '.join([(run['text'] if 'text' in run else ' ') for run in action["message"]["runs"]]),
                 "userId": user_id
             }
@@ -263,12 +264,11 @@ def convertTime(msec: float):
     date = datetime.fromtimestamp(
         msec / 1000, timezone(timedelta(hours=9)))  # JSTに変換
     # 年、月、日、時間、分、秒を取得し、パディングして組み合わせて返す
-    return "{}/{}/{} {}:{}:{}".format(date.year,
+    return "{}/{}/{} {}:{}".format(date.year,
                                       str(date.month).zfill(2),
                                       str(date.day).zfill(2),
                                       str(date.hour).zfill(2),
                                       str(date.minute).zfill(2),
-                                      str(date.second).zfill(2)
                                       )
 
 
@@ -276,7 +276,8 @@ def get_update_date(file_path: str) -> float:
     return os.path.getmtime(file_path)
 
 
-def watch_comment(queue:Any, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス,live_id: str):
+# def watch_comment(queue:Any, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス,live_id: str):
+def watch_comment(last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス,live_id: str):
     current_modified_date = get_update_date(chat_file_path)
     comments_modified: list[str] = []
     if current_modified_date > last_modified_date:
@@ -287,37 +288,37 @@ def watch_comment(queue:Any, last_modified_date: float, chat_file_path: str, las
         last_row = len(comment_history_list) - 1
         comment_history_dict = update_dictionary(
             comment_history_dict, comment_history_new,live_id)
-        try:
-            # comment_history_last_row = json.loads(
-            #     comment_history_list[last_row])
-            # comment_history_last = convert_json_to_dict(
-            #     comment_history_last_row)
-            # messages = (copy.deepcopy(
-            #     comment_history_dict[comment_history_last['userId']]))
-            # messages.reverse()
-            # comments_modified = [message['comment']
-            #         for message in messages
-            # ]
-            # messages_modified = {
-            #     '名前': comment_history_last['displayName'],
-            #     'コメント': comments_modified
-            # }
-            # if (チャットGPTハンドラー.api_key != ''):
-            #     messages_modified['分析'] = チャットGPTハンドラー.チャットGPTへ問いかけ(comments_modified[::-1])
+        # try:
+        #     # comment_history_last_row = json.loads(
+        #     #     comment_history_list[last_row])
+        #     # comment_history_last = convert_json_to_dict(
+        #     #     comment_history_last_row)
+        #     # messages = (copy.deepcopy(
+        #     #     comment_history_dict[comment_history_last['userId']]))
+        #     # messages.reverse()
+        #     # comments_modified = [message['comment']
+        #     #         for message in messages
+        #     # ]
+        #     # messages_modified = {
+        #     #     '名前': comment_history_last['displayName'],
+        #     #     'コメント': comments_modified
+        #     # }
+        #     # if (チャットGPTハンドラー.api_key != ''):
+        #     #     messages_modified['分析'] = チャットGPTハンドラー.チャットGPTへ問いかけ(comments_modified[::-1])
 
-            if queue != '':
-                queue.put('update')
-            else:
-                print('update')
-        # except :
-        except Exception as error:
-            # print('----------')
-            # print('error')
-            # print(error)
-            # print(json.dumps(
-            #     comment_history_list[last_row], indent=2, ensure_ascii=False))
-            # print('++++++++++')
-            pass
+        #     # if queue != '':
+        #     #     queue.put('update')
+        #     # else:
+        #     #     print('update')
+        # # except :
+        # except Exception as error:
+        #     # print('----------')
+        #     # print('error')
+        #     # print(error)
+        #     # print(json.dumps(
+        #     #     comment_history_list[last_row], indent=2, ensure_ascii=False))
+        #     # print('++++++++++')
+        #     pass
     return (last_modified_date, comment_history_dict)
 
 def is_running_on_colab():
@@ -352,14 +353,15 @@ def delete_live_chat_files():
     for file in file_list:
         os.remove(file)
 
-def replace_watch_comment(queue:Any, live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
+# def replace_watch_comment(queue:Any, live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
+def replace_watch_comment(live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
     """"
         watch_comment(last_modified_date)を1秒待機しては、繰り返し実行する.
         再帰ではなくwhileを使う
     """
     # 初期化
     delete_live_chat_files()    
-    queue.put('init')
+    # queue.put('init')
     comment_history_dict: Dict[str, List[CommentData]] = {}
     last_row = 0
     last_history_modified_date:float =0
@@ -369,7 +371,8 @@ def replace_watch_comment(queue:Any, live_id: str,チャットGPTハンドラー
     start_time = time.time()
     while time.time() - start_time < 60*10:
         try:
-            last_history_modified_date,comment_history_dict = watch_comment(queue, last_history_modified_date, chat_file_path,
+            # last_history_modified_date,comment_history_dict = watch_comment(queue, last_history_modified_date, chat_file_path,
+            last_history_modified_date,comment_history_dict = watch_comment(last_history_modified_date, chat_file_path,
                         last_row, comment_history_dict, チャットGPTハンドラー, live_id)
         except Exception as error:
             print(error)
