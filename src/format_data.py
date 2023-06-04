@@ -2,14 +2,17 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Dict
 from typing import List
+from typing import Any
+from typing import Literal
+from typing import Union
 from typing import TypedDict
 import os
 import json
 from multiprocessing import Queue
+import glob
+
 import copy
 from GptHandler import チャットGPTハンドラークラス
-
-import openai
 
 
 class CommentData(TypedDict):
@@ -98,6 +101,67 @@ class CommentRowData(TypedDict):
     videoOffsetTimeMsec: str
     isLive: bool
 
+class chat_transaction(TypedDict):
+    user_id: str
+    display_name: str
+    chat: str
+    date: str
+
+
+def load_json(file_path: str) -> List[chat_transaction]:
+    """指定したパスのJSONファイルを読み込みます。ファイルが存在しない場合は新しいリストを返します。
+
+    Args:
+        file_path (str): JSONファイルへのパス。
+
+    Returns:
+        List[Any]: JSONから読み込んだデータ、または新しいリスト。
+    """
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data:List[chat_transaction] = json.load(f)
+    else:
+        data:List[chat_transaction] = []  # ファイルが存在しない場合は新しいリストを作成
+
+    return data
+
+
+def update_and_save_json(file_path: str, data: List[chat_transaction]|Dict[str, List[CommentData]]) -> None:
+    """リストに要素を追加し、それを同じJSONファイルに書き込みます。
+
+    Args:
+        file_path (str): JSONファイルへのパス。
+        data (List[Any]): 追加するデータ。
+
+    Returns:
+        None
+    """
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def update_json_file(file_path: str, new_chats: List[chat_transaction]) -> None:
+    """JSONファイルからデータを読み込み、新たな要素を追加し、それを同じファイルに保存します。
+
+    Args:
+        file_path (str): JSONファイルへのパス。
+        new_element (Any): 追加する新しい要素。
+
+    Returns:
+        None
+    """
+    # JSONファイルを読み込み。ファイルが存在しない場合は新しいリストを作成。
+    data = load_json(file_path)
+
+    # リストに新たな要素を含むlistを末尾に結合。ただしdataはimmutableなので、新しいlistを作成する。
+    data = data + new_chats
+
+    # 結果を同じファイルに書き込み
+    update_and_save_json(file_path, data)
+
+
+
+
 
 def text_reader(file_path: str) -> str:
     """
@@ -144,14 +208,16 @@ def translator(comments: List[str]) -> Dict[str, List[CommentData]]:
     return user_comments
 
 
-def update_dictionary(user_comments: Dict[str, List[CommentData]], comments: List[str]) -> Dict[str, List[CommentData]]:
+def update_dictionary(user_comments: Dict[str, List[CommentData]], comments: List[str],live_id: str) -> Dict[str, List[CommentData]]:
+    new_chat_transactions: List[chat_transaction] = []
     for comment in comments:
         try:
             data: CommentRowData = json.loads(comment)
             action = data["replayChatItemAction"]["actions"][0]["addChatItemAction"]["item"]["liveChatTextMessageRenderer"]
             user_id = action["authorExternalChannelId"]
             current_comment: CommentData = {
-                "displayName": action["authorName"]["simpleText"],
+                # "displayName": action["authorName"]["simpleText"],
+                "displayName": user_id,
                 "date": datetime.fromtimestamp(int(action["timestampUsec"]) / 1_000_000).isoformat(),
                 "comment": ' '.join([(run['text'] if 'text' in run else ' ') for run in action["message"]["runs"]]),
                 "userId": user_id
@@ -160,6 +226,13 @@ def update_dictionary(user_comments: Dict[str, List[CommentData]], comments: Lis
                 user_comments[user_id] = [current_comment]
             elif not any(d['date'] == current_comment['date'] for d in user_comments[user_id]):
                 user_comments[user_id].append(current_comment)
+            new_chat_transactions.append({
+                "user_id": current_comment['userId'],
+                "chat": current_comment['comment'],
+                "date": current_comment['date'],
+                "display_name": current_comment['userId'],
+                # "display_name": current_comment['displayName'],
+            })
         # except:
         except Exception as error:
             pass
@@ -168,6 +241,17 @@ def update_dictionary(user_comments: Dict[str, List[CommentData]], comments: Lis
             # print(error)
             # print(comment)
             # print('----------')
+    try :
+        update_json_file(f'{live_id}_chat.json', new_chat_transactions)
+        update_and_save_json(f'{live_id}_each_chat.json', user_comments)
+    # except:
+    except Exception as error:
+        pass
+        # print('----------')
+        # print('error')
+        # print(error)
+        # print(comment)
+        # print('----------')
     return user_comments
 
 
@@ -192,7 +276,7 @@ def get_update_date(file_path: str) -> float:
     return os.path.getmtime(file_path)
 
 
-def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス):
+def watch_comment(queue:Any, last_modified_date: float, chat_file_path: str, last_row: int, comment_history_dict: Dict[str, List[CommentData]],チャットGPTハンドラー:チャットGPTハンドラークラス,live_id: str):
     current_modified_date = get_update_date(chat_file_path)
     comments_modified: list[str] = []
     if current_modified_date > last_modified_date:
@@ -202,32 +286,29 @@ def watch_comment(queue, last_modified_date: float, chat_file_path: str, last_ro
         comment_history_new = comment_history_list[last_row:]
         last_row = len(comment_history_list) - 1
         comment_history_dict = update_dictionary(
-            comment_history_dict, comment_history_new)
+            comment_history_dict, comment_history_new,live_id)
         try:
-            comment_history_last_row = json.loads(
-                comment_history_list[last_row])
-            comment_history_last = convert_json_to_dict(
-                comment_history_last_row)
-            messages = (copy.deepcopy(
-                comment_history_dict[comment_history_last['userId']]))
-            messages.reverse()
-            comments_modified = [message['comment']
-                    for message in messages
-            ]
-            messages_modified = {
-                '名前': comment_history_last['displayName'],
-                'コメント': comments_modified
-            }
-            if (チャットGPTハンドラー.api_key != ''):
-                messages_modified['分析'] = チャットGPTハンドラー.チャットGPTへ問いかけ(comments_modified[::-1])
+            # comment_history_last_row = json.loads(
+            #     comment_history_list[last_row])
+            # comment_history_last = convert_json_to_dict(
+            #     comment_history_last_row)
+            # messages = (copy.deepcopy(
+            #     comment_history_dict[comment_history_last['userId']]))
+            # messages.reverse()
+            # comments_modified = [message['comment']
+            #         for message in messages
+            # ]
+            # messages_modified = {
+            #     '名前': comment_history_last['displayName'],
+            #     'コメント': comments_modified
+            # }
+            # if (チャットGPTハンドラー.api_key != ''):
+            #     messages_modified['分析'] = チャットGPTハンドラー.チャットGPTへ問いかけ(comments_modified[::-1])
 
             if queue != '':
-                queue.put(
-                    # messages_modified
-                    json.dumps(messages_modified, ensure_ascii=False, indent=2)
-                )
+                queue.put('update')
             else:
-                print(json.dumps(messages_modified, ensure_ascii=False, indent=2))
+                print('update')
         # except :
         except Exception as error:
             # print('----------')
@@ -257,15 +338,28 @@ def get_latest_file_path(chat_file_path:str):
     return './' +files[0]
 
 
+def delete_live_chat_files():
+    """同ディレクトリに存在する'.live_chat.json'を名前に含むすべてのファイルを削除します。
 
+    Returns:
+        None
+    """
+    # ディレクトリ内の'.live_chat.json'を名前に含むファイルを検索
+    file_list = glob.glob('./*_chat.json')
+    print(file_list)
 
-def replace_watch_comment(queue, live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
+    # 各ファイルを削除
+    for file in file_list:
+        os.remove(file)
+
+def replace_watch_comment(queue:Any, live_id: str,チャットGPTハンドラー:チャットGPTハンドラークラス):
     """"
         watch_comment(last_modified_date)を1秒待機しては、繰り返し実行する.
         再帰ではなくwhileを使う
     """
-    queue.put('test')
     # 初期化
+    delete_live_chat_files()    
+    queue.put('init')
     comment_history_dict: Dict[str, List[CommentData]] = {}
     last_row = 0
     last_history_modified_date:float =0
@@ -276,7 +370,7 @@ def replace_watch_comment(queue, live_id: str,チャットGPTハンドラー:チ
     while time.time() - start_time < 60*10:
         try:
             last_history_modified_date,comment_history_dict = watch_comment(queue, last_history_modified_date, chat_file_path,
-                        last_row, comment_history_dict, チャットGPTハンドラー)
+                        last_row, comment_history_dict, チャットGPTハンドラー, live_id)
         except Exception as error:
             print(error)
             pass
