@@ -12,7 +12,7 @@ from multiprocessing import Queue
 import glob
 
 import copy
-from GptHandler import チャットGPTハンドラークラス
+from commentSupporter.src.GptHandler import チャットGPTハンドラークラス
 
 
 class CommentData(TypedDict):
