@@ -102,6 +102,9 @@ class チャットGPTハンドラークラス:
             'messages': messages,
             'temperature': self._temperature, 
         }
-        res:str = openai.ChatCompletion.create(**prompt_setting)["choices"][0]["message"]["content"] # type: ignore
-        assert isinstance(res, str)
+        try:
+            res:str = openai.ChatCompletion.create(**prompt_setting)["choices"][0]["message"]["content"] # type: ignore
+            assert isinstance(res, str)
+        except Exception as error:
+            res:str = 'chatGPTへのアクセスに失敗しました。'
         return res
