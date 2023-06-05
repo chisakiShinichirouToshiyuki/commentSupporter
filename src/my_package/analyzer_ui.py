@@ -1,19 +1,11 @@
 from IPython.display import display
-
 import ipywidgets as widgets
 from typing import TypedDict, List, Dict, Union
 from typing import TYPE_CHECKING
 import json
 import os
 
-
-def is_running_on_colab():
-    return 'COLAB_GPU' in os.environ
-
-if TYPE_CHECKING or not is_running_on_colab():
-    from my_package.gpt_handler import チャットGPTハンドラークラス
-else:
-    from commentSupporter.src.gpt_handler import チャットGPTハンドラークラス
+from .gpt_handler import チャットGPTハンドラークラス
 
 class chat_transaction(TypedDict):
     user_id: str

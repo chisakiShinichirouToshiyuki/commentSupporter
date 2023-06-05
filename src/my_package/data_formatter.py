@@ -7,18 +7,10 @@ from datetime import timedelta
 from datetime import timezone
 from typing import Dict
 from typing import List
-from typing import TYPE_CHECKING
 from typing import TypedDict
 from typing import Tuple
 
-
-def is_running_on_colab():
-    return 'COLAB_GPU' in os.environ
-
-if TYPE_CHECKING or not is_running_on_colab():
-    from my_package.gpt_handler import チャットGPTハンドラークラス
-else:
-    from commentSupporter.src.my_package.gpt_handler import チャットGPTハンドラークラス
+from my_package.gpt_handler import チャットGPTハンドラークラス
 
 
 class CommentData(TypedDict):
