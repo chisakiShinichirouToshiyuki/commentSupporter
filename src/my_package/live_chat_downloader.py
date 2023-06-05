@@ -1,8 +1,3 @@
-import importlib
-
-if importlib.util.find_spec('yt-dlp') is None:
-    !pip install yt-dlp
-
 from yt_dlp import YoutubeDL
 import glob
 
