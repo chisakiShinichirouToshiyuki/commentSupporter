@@ -76,7 +76,7 @@ class AnalyzerUi:
 
         right_column = widgets.VBox([self._title_2, self._select_2, self._footer_2], layout=widgets.Layout(width='50%', overflow='auto'))
 
-        update_button = widgets.Button(description="Update")
+        update_button = widgets.Button(description="手動アップデート")
         update_button.on_click(self._update) 
 
         footer_1 = widgets.HBox([widgets.Label(value=''), update_button], layout=widgets.Layout(width='auto'))
