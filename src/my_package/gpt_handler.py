@@ -1,3 +1,9 @@
+import importlib
+
+if importlib.util.find_spec('openai') is None:
+    !pip install openai
+
+
 from typing import List
 from typing import Literal
 from typing import TypedDict
