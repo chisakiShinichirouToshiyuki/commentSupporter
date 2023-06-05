@@ -138,7 +138,7 @@ class DataFormatter:
         start_time = time.time()
         while time.time() - start_time < 60*10:
             try:
-                self._last_history_modified_date, self._comment_history_dict = self._watch_comment()
+                self._last_history_modified_date = self._watch_comment()
             except Exception as error:
                 print(error)
             time.sleep(3)
@@ -358,7 +358,7 @@ class DataFormatter:
             pass
         return user_comments
 
-    def _watch_comment(self) -> Tuple[float, Dict[str, List[CommentData]]]:
+    def _watch_comment(self) -> float:
         """
         コメントを監視し、更新があった場合にコメント履歴を更新します。
 
@@ -373,16 +373,14 @@ class DataFormatter:
             Tuple[float, Dict[str, List[CommentData]]]: 更新後の最終更新日時とコメント履歴の辞書。
         """
         current_modified_date = self._get_update_date(self._chat_file_path)
-        comments_modified: list[str] = []
         if current_modified_date > self._last_history_modified_date:
             self._last_history_modified_date = current_modified_date
             comment_history_str = self._text_reader(self._chat_file_path)
             comment_history_list = self._split_text(comment_history_str)[:-1]
             comment_history_new = comment_history_list[self._last_row:]
-            self._last_row = len(comment_history_list) - 1
-            comment_history_dict = self._update_dictionary(self._comment_history_dict, comment_history_new, self._live_id)
-            assert isinstance(comment_history_dict, Dict)
-        return (self._last_history_modified_date, comment_history_dict)
+            self._last_row = len(comment_history_list)
+            self._comment_history_dict = self._update_dictionary(self._comment_history_dict, comment_history_new, self._live_id)
+        return self._last_history_modified_date
 
 
     def _update_json_file(self, file_path: str, new_chats: List[chat_transaction]) -> None:
