@@ -10,7 +10,7 @@ from typing import List
 from typing import TypedDict
 from typing import Tuple
 
-from my_package.gpt_handler import チャットGPTハンドラークラス
+from .gpt_handler import チャットGPTハンドラークラス
 
 
 class CommentData(TypedDict):
