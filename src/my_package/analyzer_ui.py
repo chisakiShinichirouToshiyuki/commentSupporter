@@ -44,11 +44,11 @@ class AnalyzerUi:
 
         """
         
-        self._list_1 = ['ロード中です：ロード中です']
+        self._list_1 = []
         self._list_2 = []
 
         scroll_end_message = [f"1{i}" for i in range(5)] if 30< len(self._list_2) else [] 
-        list_1_all = scroll_end_message + self._list_1 + scroll_end_message[::-1]
+        list_1_all =  ['ロード中です。下記アップデートボタンを押下して、チャットが表示されるか確かめてください。']
         list_2_all = scroll_end_message + self._list_2 + scroll_end_message[::-1]
 
         self._select_1 = widgets.SelectMultiple(
